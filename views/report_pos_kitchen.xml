@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <!--
+    Kitchen Ticket report for POS orders
+    - Shows: PARA LLEVAR (to-go), Customer name, Online flag, Pricelist
+    - Simple, bold, and receipt-printer friendly
+    - Safe checks for optional fields (won't crash if the field/module isn't present)
+  -->
+
+  <!-- Report action (reuse/replace as needed) -->
+  <record id="action_report_pos_kitchen" model="ir.actions.report">
+    <field name="name">Kitchen Order</field>
+    <field name="model">pos.order</field>
+    <field name="report_type">qweb-pdf</field>
+    <field name="report_name">kesiyos_pos_auto_kitchen.report_pos_kitchen_document</field>
+    <field name="report_file">kesiyos_pos_auto_kitchen.report_pos_kitchen_document</field>
+    <field name="print_report_name">'Kitchen - ' + (object.name or '')</field>
+    <!-- Paper format: narrow margins for receipt-style output -->
+    <field name="paperformat_id" eval="ref('base.paperformat_euro')"/>
+  </record>
+
+  <!-- Main Kitchen Ticket Template -->
+  <template id="report_pos_kitchen_document">
+    <t t-call="web.external_layout">
+      <t t-foreach="docs" t-as="o">
+        <div class="kitchen-ticket">
+          <!-- Header -->
+          <div class="k-head">
+            <div class="k-title">KITCHEN ORDER</div>
+            <div class="k-sub">
+              <t t-esc="o.name or ''"/>
+              <t t-if="o._fields.get('session_id') and o.session_id"> • <t t-esc="o.session_id.name"/></t>
+            </div>
+            <div class="k-sub">
+              <t t-esc="(o.date_order and o.date_order.strftime('%Y-%m-%d %H:%M')) or ''"/>
+            </div>
+          </div>
+
+          <!-- Essentials block -->
+          <div class="k-meta">
+            <!-- PARA LLEVAR (To-Go) -->
+            <t t-if="o._fields.get('is_togo_order') and o.is_togo_order">
+              <div class="k-flag togo">🧺 PARA LLEVAR</div>
+            </t>
+
+            <!-- Customer -->
+            <t t-if="o.partner_id">
+              <div><span class="k-label">Cliente:</span> <span t-esc="o.partner_id.name"/></div>
+            </t>
+
+            <!-- Online / Self-Order flag -->
+            <t t-if="(o._fields.get('is_self_order') and o.is_self_order) or (o._fields.get('self_order_id') and o.self_order_id)">
+              <div class="k-flag online">Pedido en línea</div>
+            </t>
+
+            <!-- Pricelist -->
+            <t t-if="o._fields.get('pricelist_id') and o.pricelist_id">
+              <div><span class="k-label">Lista de precios:</span> <span t-esc="o.pricelist_id.name"/></div>
+            </t>
+          </div>
+
+          <!-- Items -->
+          <table class="k-lines" width="100%" cellspacing="0" cellpadding="0">
+            <thead>
+              <tr>
+                <th class="qty">Cant</th>
+                <th class="name">Producto</th>
+                <th class="extras">Notas</th>
+              </tr>
+            </thead>
+            <tbody>
+              <t t-foreach="o.lines" t-as="line">
+                <tr>
+                  <td class="qty">
+                    <t t-esc="('%g' % line.qty).rstrip('0').rstrip('.') if isinstance(line.qty, float) else line.qty"/>
+                  </td>
+                  <td class="name">
+                    <t t-esc="line.product_id.display_name or line.product_id.name"/>
+                  </td>
+                  <td class="extras">
+                    <!-- POS line note (restaurant) -->
+                    <t t-if="line._fields.get('note') and line.note">
+                      <div class="note" t-esc="line.note"/>
+                    </t>
+                    <!-- Some installs use 'customer_note' -->
+                    <t t-if="line._fields.get('customer_note') and line.customer_note">
+                      <div class="note" t-esc="line.customer_note"/>
+                    </t>
+                  </td>
+                </tr>
+              </t>
+            </tbody>
+          </table>
+
+          <!-- Order-level note (optional) -->
+          <t t-if="o._fields.get('note') and o.note">
+            <div class="k-order-note">
+              <div class="k-label">Nota del pedido:</div>
+              <div class="note" t-esc="o.note"/>
+            </div>
+          </t>
+
+          <!-- Footer -->
+          <div class="k-footer">
+            <t t-if="o._fields.get('table_id') and o.table_id">
+              <div><span class="k-label">Mesa:</span> <t t-esc="o.table_id.name"/></div>
+            </t>
+            <div class="k-thanks">— enviar a cocina —</div>
+          </div>
+        </div>
+      </t>
+    </t>
+
+    <!-- Minimal print styles tuned for receipt/kitchen printers -->
+    <style>
+      .kitchen-ticket { font-size: 12px; line-height: 1.35; color: #000; padding: 4px 2px; }
+      .k-head { text-align: center; margin-bottom: 4px; }
+      .k-title { font-weight: 800; font-size: 16px; letter-spacing: 0.5px; }
+      .k-sub { font-size: 11px; }
+      .k-meta { margin: 6px 0 6px 0; }
+      .k-label { font-weight: 700; }
+      .k-flag { font-weight: 800; margin: 2px 0; }
+      .k-flag.togo { font-size: 14px; }
+      .k-flag.online { font-size: 12px; }
+      .k-lines { border-collapse: collapse; width: 100%; }
+      .k-lines thead th { border-bottom: 1px solid #000; padding: 2px 0; text-align: left; font-size: 11px; }
+      .k-lines td { vertical-align: top; padding: 2px 0; }
+      .k-lines .qty { width: 28px; text-align: right; padding-right: 6px; font-weight: 700; }
+      .k-lines .name { width: 55%; font-weight: 700; }
+      .k-lines .extras .note { font-size: 11px; }
+      .k-order-note { margin-top: 6px; }
+      .k-footer { margin-top: 8px; text-align: center; }
+      .k-thanks { margin-top: 4px; font-size: 11px; }
+      /* Tight page setup for PDF-to-receipt */
+      @page { margin: 6mm 6mm 6mm 6mm; }
+    </style>
+  </template>
+
+  <!-- (Optional) plain HTML version if you ever want qweb-html -->
+  <template id="report_pos_kitchen_document_html" inherit_id="kesiyos_pos_auto_kitchen.report_pos_kitchen_document"/>
+</odoo>

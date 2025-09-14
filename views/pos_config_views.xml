@@ -1,15 +1,18 @@
-<!-- /odoo/custom/addons/kesiyos_pos_auto_kitchen/views/pos_config_views.xml -->
 <odoo>
   <record id="view_pos_config_form_auto_kitchen" model="ir.ui.view">
     <field name="name">pos.config.form.auto.kitchen</field>
     <field name="model">pos.config</field>
-    <field name="inherit_id" ref="point_of_sale.view_pos_config_form"/>
+
+    <!-- Odoo 17 correct view id -->
+    <field name="inherit_id" ref="point_of_sale.pos_config_view_form"/>
+
     <field name="arch" type="xml">
-      <!-- Put the toggle near other connected devices / printers -->
-      <xpath expr="//group[.//field[@name='iface_print_bill']]" position="after">
+      <!-- Safe insertion at end of sheet -->
+      <xpath expr="//sheet" position="inside">
         <group string="Kitchen Printing">
           <field name="auto_kitchen_on_payment"/>
-          <label string="Requires Order Printers configured in this POS." for="auto_kitchen_on_payment"/>
+          <label for="auto_kitchen_on_payment"
+                 string="Requires Order Printers configured in this POS."/>
         </group>
       </xpath>
     </field>
